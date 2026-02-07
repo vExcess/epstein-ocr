@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        const img = new Image();
+        img.src = "./EFTA00400459/EFTA00400459-02.webp"; 
+        img.onload = () => {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            
+            // Now you can process it
+            process(ctx, canvas.width, canvas.height);
+
+            for (var i = 0; i < characterBitmaps.length; i++) {
+                var bm = characterBitmaps[i];
+            }
+        };
+
+        function line(a, b, c, d) {
+            ctx.beginPath();          // Start a new path
+            ctx.moveTo(a, b+0.5);       // Move to the starting point (50, 50)
+            ctx.lineTo(c, d+0.5);     // Draw a line to the end point (200, 100)
+            ctx.lineWidth = 1;        // Set the line width to 5 pixels
+            ctx.strokeStyle = "red";  // Set the line color to red
+            ctx.stroke();           // Render the line
+        }
+    </script>
+
+    <script src="./processImage.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+    "name": "epstein-ocr",
+    "version": "1.0.0",
+    "dependencies": {
+        "@tensorflow/tfjs-node": "^4.22.0",
+        "canvas": "^3.2.1"
+    }
+}
