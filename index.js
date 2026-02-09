@@ -11,6 +11,8 @@ const tf = require('@tensorflow/tfjs-node');
 const imageProcessor = require("./processImage.js");
 const trainingData = require("./training_data.js").join("").split("");
 
+let docName = process.argv[2];
+
 const charSet = "abcdefghijklmnopqrstuvwyxzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/=?"; 
 
 const savePath = 'file://./epstein-ocr-model';
@@ -120,9 +122,21 @@ async function trainOCR(bitmaps, characters, width, height) {
 let canvas = null;
 let ctx = null;
 
-async function drawImageI(i) {
+function getPNGImagePath(docName, idx) {
+    let imagePath = null;
+    for (var i = 1; i <= 5; i++) {
+        let idxString = idx.toString().padStart(i, "0");
+        let path = `./files/${docName}/png/${docName}-${idxString}.png`;
+        if (fs.existsSync(path)) {
+            imagePath = path;
+        }
+    }
+    return imagePath;
+}
+
+async function drawImageI(docName, idx) {
     // 1. Load from local file
-    const image = await loadImage(`./PNG_EFTA00400459/EFTA00400459-${i}.png`);
+    const image = await loadImage(getPNGImagePath(docName, idx));
     canvas = createCanvas(image.width, image.height);
     ctx = canvas.getContext('2d');
     ctx.drawImage(image, 0, 0);
@@ -130,7 +144,7 @@ async function drawImageI(i) {
 
 async function main() {
     // load & process training image
-    await drawImageI("02");
+    await drawImageI(docName, 2);
     imageProcessor.process(ctx, canvas.width, canvas.height);
 
     // train the model
@@ -152,7 +166,7 @@ async function main() {
     for (var i = 2; i <= 76; i++) {
         console.log("Processing image " + i + "...");
 
-        await drawImageI(i.toString().padStart(2, "0"));
+        await drawImageI(docName, i);
         imageProcessor.process(ctx, canvas.width, canvas.height);
 
         for (var j = 0; j < imageProcessor.charDatas().length; j++) {
@@ -163,19 +177,18 @@ async function main() {
     var firstLine = "JVBERi0xLjUNJeLjz9MNCjM0IDAgb2JqDTw8L0xpbmVhcml6ZWQgMS9MIDI3NjAyOC9PIDM2L0Ug";
     var lastLine = "ZWFtDWVuZG9iag1zdGFydHhyZWYNCjExNg0KJSVFT0YNCg";
 
-    // since = are only at the end of the file, they won't be in the training data
+    // since '=' are only at the end of the file, they won't be in the training data
     // so I handle them manually
     out = firstLine + out.slice(0, out.indexOf(lastLine)) + lastLine + "==";
 
-    if (!fs.existsSync("./output")) {
-        fs.mkdirSync("./output");
+    if (!fs.existsSync(`./files/${docName}/output`)) {
+        fs.mkdirSync(`./files/${docName}/output`);
     }
 
-    fs.writeFileSync("./output/base64.txt", out);
-    fs.writeFileSync("./output/document.pdf", Buffer.from(out, "base64"));
+    fs.writeFileSync(`./files/${docName}/output/base64.txt`, out);
+    fs.writeFileSync(`./files/${docName}/output/output.pdf`, Buffer.from(out, "base64"));
 
     console.log("OCR complete!");
-    console.log("Output in output-base64.txt");
 }
 
 main();

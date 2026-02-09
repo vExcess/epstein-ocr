@@ -7,8 +7,10 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         
+        let docName = "EFTA00400459";
+
         const img = new Image();
-        img.src = "./EFTA00400459/EFTA00400459-02.webp"; 
+        img.src = `./${docName}/${docName}-02.webp`; 
         img.onload = () => {
             canvas.width = img.width;
             canvas.height = img.height;
