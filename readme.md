@@ -1,5 +1,5 @@
 # Epstein OCR
-The Epstein files contain base64 data. What is contained in it?
+The Epstein files contain base64 data. What information is hidden in the base64?
 
 Original Write Up: [https://neosmart.net/blog/recreating-epstein-pdfs-from-raw-encoded-attachments/
 ](https://neosmart.net/blog/recreating-epstein-pdfs-from-raw-encoded-attachments/
@@ -12,9 +12,9 @@ These are the files successfully decoded with my model. It may or may not be abl
 - EFTA00400459
 
 ## Notes
-This project is heavily "vibe coded".
+This project is partially "vibe coded".
 
-Running this project will consume 6 GB of RAM (I think it's memory leaking somewhere, but idk).
+Running this project gradually consumes more and more memory. For me it consumes 6 GB despite me calling .dispose() on my tensors to free their memory.
 
 ## Running
 My code currently doesn't handle pages/images that include non-base64 text so the first and last page of the base64 images need slight manual intervention. Also this project only runs on Linux.
@@ -56,12 +56,20 @@ If extracting from images, you must have ffmpeg installed.
 `sudo apt install ffmpeg`
 
 perform the image extraction: `node extract-images.js {DOC_NAME}`  
-e.g. `node extract-images.js EFTA00382108`  
+e.g. `node extract-images.js EFTA00400459`  
 
-### Training and Decoding
-Run `node index.js`. 
+### Training
+Run `node train.js`
 
-This will create and train the OCR model if it doesn't already exist in the `epstein-ocr-model` directory. If the model already exists, the script will skip training and automatically jump to extracting the base64 from the images. This takes a while, but once complete the output will be written to the directory ./files/{DOC_NAME}/output. If the `output.pdf` file in output is openable then we have success, otherwise the model made an error in its transcription.
+This will train the OCR model and save it to the `epstein-ocr-model` directory. If the model already exists in that directory, it loads and continues training the existing model, otherwise it creates a new model from scratch.
+
+Note: Be wary of overtraining the model. Too much training makes it perform worse.
+
+### Decoding Base64
+Run `node decode.js {DOC_NAME}`  
+e.g. `node decode.js EFTA00400459`  
+
+Extracts the base64 from the images and saves it as a base64 file and a binary file. This takes a while, but once complete the output will be written to the directory ./files/{DOC_NAME}/output. If the `output.pdf` file in output is openable then we have success, otherwise the model made an error in its transcription.
 
 ## ToDo
 - Automatically handle non-base64 data being included on the first and last pages

@@ -1,6 +1,4 @@
-let characterBitmaps = [];
-
-var rightShift = 0;
+let rightShift = 0;
 
 /**
  * Downscales ImageData by half.
@@ -45,100 +43,199 @@ function downscaleHalf(imageData) {
     };
 }
 
-function charDatas() {
-    return characterBitmaps;
-}
-
-function process(ctx, canvasWidth, canvasHeight) {
-    characterBitmaps = [];
-
-    var imageData = ctx.getImageData(0, 0, canvasWidth, canvasHeight);
-
-    var xOff = 189;
-    var xWidth = 24.38;
-
-    var yOff = 122 - 5;
-    var yHeight = 46.9;
-
-    var yPad = 4;
-
-    var yPositions = [];
-    var y = yOff;
-    for (var i = 0; i < 65; i++) {
-        yPositions.push(Math.round(y));
-        y += yHeight;
+/*
+    Processes the canvas context and returns an array
+    of character data where the data for a character
+    follows the format
+    {
+        width: Integer,
+        height: Integer,
+        data: Array<Integer>
     }
+*/
+function process(ctx, canvasWidth, canvasHeight) {
+    let characterDatas = [];
 
-    // window.diffs = [];
-    for (var i = 0; i < yPositions.length; i++) {
-        var y = yPositions[i];
+    let imageData = ctx.getImageData(0, 0, canvasWidth, canvasHeight);
 
-        var isRowWhite = true;
-        while (isRowWhite) {
-            // start and stop of the caret
-            for (var x = 130; x < 170; x++) {
-                var idx = (x + y * imageData.width) << 2;
-                var r = imageData.data[idx];
-                var g = imageData.data[idx+1];
-                var b = imageData.data[idx+2];
-                if (r !== 255 || g !== 255 || b !== 255) {
+    // estimate left of caret
+    let caretX = 0;
+    let caretWidth = 24;
+    {
+        let isRowWhite = true;
+        while (isRowWhite && caretX < canvasWidth) {
+            for (let y = 0; y < canvasHeight; y++) {
+                const idx = (caretX + y * imageData.width) << 2;
+                const r = imageData.data[idx];
+                const g = imageData.data[idx+1];
+                const b = imageData.data[idx+2];
+                if (r < 255 || g < 255 || b < 255) {
                     isRowWhite = false;
                     break;
                 }
             }
             if (isRowWhite) {
-                y++;   
+                caretX++;   
             }
         }
 
-        if (typeof line === "function") {
-            line(130, y, 170, y);
-        }
-
-        // subtract fixed amount from top of caret
-        y -= 7;
-
-        // diffs.push(y - yPositions[i]);
-        yPositions[i] = y;
+        caretX--;
     }
 
-    var chWidth = Math.ceil(xWidth);
-    var chHeight = Math.ceil(yHeight) - yPad;
+    let caretY = canvasHeight - 1;
+    let caretHeight = 0;
+    {
+        let isRowWhite = true;
+        // find bottom of caret
+        while (isRowWhite && caretY >= 0) {
+            for (let x = caretX; x < caretX + caretWidth; x++) {
+                let idx = (x + caretY * imageData.width) << 2;
+                let r = imageData.data[idx];
+                let g = imageData.data[idx+1];
+                let b = imageData.data[idx+2];
+                if (r < 255 || g < 255 || b < 255) {
+                    isRowWhite = false;
+                    break;
+                }
+            }
+            if (isRowWhite) {
+                caretY--;   
+            }
+        }
 
-    for (var i = 0; i < yPositions.length; i++) {
-        var y = yPositions[i];
-        var x = xOff;
-        for (var j = 0; j < 76; j++) {
-            var xPos = Math.round(x);
-            var yPos = Math.round(y);
+        // find top of caret
+        while (!isRowWhite && caretY >= 0) {
+            // start and stop of the caret
+            isRowWhite = true;
+            for (let x = caretX; x < caretX + caretWidth; x++) {
+                let idx = (x + caretY * imageData.width) << 2;
+                let r = imageData.data[idx];
+                let g = imageData.data[idx+1];
+                let b = imageData.data[idx+2];
+                if (r < 255 || g < 255 || b < 255) {
+                    isRowWhite = false;
+                    break;
+                }
+            }
+            if (!isRowWhite) {
+                caretY--;
+                caretHeight++;
+            }
+        }
+    }
+
+    let carets = [];
+    const yHeight = 46.9;
+    for (let i = 0; i < 65; i++) {
+        if (Math.round(caretY) > 0) {
+            let caret = {
+                x: caretX,
+                y: Math.round(caretY),
+                halfHeight: caretHeight / 2
+            };
+
+            {
+                // find exact left of caret
+                let isRowWhite = true;
+                while (isRowWhite && caret.x < canvasWidth) {
+                    for (let y = caret.y; y < caret.y + caretHeight; y++) {
+                        const idx = (caret.x + y * imageData.width) << 2;
+                        const r = imageData.data[idx];
+                        const g = imageData.data[idx+1];
+                        const b = imageData.data[idx+2];
+                        if (r < 255 || g < 255 || b < 255) {
+                            isRowWhite = false;
+                            break;
+                        }
+                    }
+                    if (isRowWhite) {
+                        caret.x++;   
+                    }
+                }
+
+                caret.x--;
+            }
+
+            {
+                // find exact top of caret
+                let isRowWhite = true;
+                while (isRowWhite && caret.y < canvasHeight) {
+                    // start and stop of the caret
+                    for (var x = caret.x; x < caret.x + caretWidth; x++) {
+                        var idx = (x + caret.y * imageData.width) << 2;
+                        var r = imageData.data[idx];
+                        var g = imageData.data[idx+1];
+                        var b = imageData.data[idx+2];
+                        if (r < 255 || g < 255 || b < 255) {
+                            isRowWhite = false;
+                            break;
+                        }
+                    }
+                    if (isRowWhite) {
+                        caret.y++;   
+                    }
+                }
+
+                caret.y--;
+            }
+
+            carets.push(caret);
+            caretY -= yHeight;
+        }
+    }
+
+    for (let i = 0; i < carets.length; i++) {
+        const caret = carets[i];
+        if (typeof line === "function") {
+            line(caret.x, caret.y, caret.x + caretWidth, caret.y);
+            line(caret.x, caret.y, caret.x, caret.y + caretHeight);
+            line(caret.x, caret.y + caret.halfHeight, caret.x + caretWidth, caret.y + caret.halfHeight);
+        }
+    }
+
+    carets = carets.reverse();
+
+    let yPad = 4;
+    let chWidth = 24.38;
+    let chHeight = Math.ceil(yHeight) - yPad;
+
+    for (let i = 0; i < carets.length; i++) {
+        const caret = carets[i];
+
+        let y = caret.y - 6;
+        let x = caret.x + 52;
+        for (let j = 0; j < 76; j++) {
+            let xPos = Math.round(x);
+            let yPos = Math.round(y);
             
             if (typeof line === "function") {
                 line(x, y, x, y + chHeight);
-                line(x, y, x + chWidth, y);
-                line(x, y + chHeight, x + chWidth, y + chHeight);
+                line(x, y, x + Math.ceil(chWidth), y);
+                line(x, y + chHeight, x + Math.ceil(chWidth), y + chHeight);
             }
 
-            var chImgData = ctx.getImageData(xPos, yPos, chWidth, chHeight);
+            let chImgData = ctx.getImageData(xPos, yPos, Math.ceil(chWidth), chHeight);
             // chImgData = downscaleHalf(chImgData);
-            var colorData = chImgData.data;
-            var black = new Array(colorData.length / 4);
-            for (var k = 0; k < colorData.length; k += 4) {
+            let colorData = chImgData.data;
+            let black = new Array(colorData.length / 4);
+            for (let k = 0; k < colorData.length; k += 4) {
                 black[k / 4] = colorData[k] >> rightShift;
             }
-            characterBitmaps.push({
+            characterDatas.push({
                 width: chImgData.width,
                 height: chImgData.height,
                 data: black
             });
 
-            x += xWidth;
+            x += chWidth;
         }
     }
+
+    return characterDatas;
 }
 
 if (typeof module !== "undefined") {
     module.exports = {
-        charDatas,
         process,
         rightShift
     };

@@ -10,7 +10,7 @@
         let docName = "EFTA00400459";
 
         const img = new Image();
-        img.src = `./${docName}/${docName}-02.webp`; 
+        img.src = `./files/${docName}/png/${docName}-075.png`; 
         img.onload = () => {
             canvas.width = img.width;
             canvas.height = img.height;
@@ -19,9 +19,9 @@
             // Now you can process it
             process(ctx, canvas.width, canvas.height);
 
-            for (var i = 0; i < characterBitmaps.length; i++) {
-                var bm = characterBitmaps[i];
-            }
+            // for (var i = 0; i < characterBitmaps.length; i++) {
+            //     var bm = characterBitmaps[i];
+            // }
         };
 
         function line(a, b, c, d) {
