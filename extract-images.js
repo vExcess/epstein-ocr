@@ -45,6 +45,7 @@ if (fs.existsSync(originalImagesPath)) {
     }
 } else if (fs.existsSync(pdfPath)) {
     // extract images from pdf
+    console.log("Extracting images...");
     execSync(`pdfimages -j ${pdfPath} ${pngImagesPath}/${docName} -png`);
 } else {
     console.log("No source to extract images from found");

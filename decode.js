@@ -31,9 +31,13 @@ async function loadOCR() {
 
 async function main() {
     const model = await loadOCR();
+
+    const inputShape = model.layers[0].batchInputShape;
+    const modelInputWidth = inputShape[2];
+    const modelInputHeight = inputShape[1];
     
     function predict(flatBitmap, width, height) {
-        const input = tf.tensor4d(flatBitmap, [1, height, width, 1]).div(255 >> imageProcessor.rightShift);
+        const input = tf.tensor4d(flatBitmap, [1, height, width, 1]).div(255 >> imageProcessor.RIGHT_SHIFT);
         const prediction = model.predict(input);
         const index = prediction.argMax(1).dataSync()[0];
 
@@ -54,10 +58,16 @@ async function main() {
         console.log("Processing image " + i + "...");
 
         await drawImageI(docName, i);
-        const charDatas = imageProcessor.process(getCtx(), getCanvas().width, getCanvas().height);
-
+        const rows = imageProcessor.process(getCtx(), getCanvas().width, getCanvas().height);
+        const charDatas = rows.flat();
         for (let j = 0; j < charDatas.length; j++) {
-            out += predict(charDatas[j].data, charDatas[j].width, charDatas[j].height);
+            const chWidth = charDatas[j].width;
+            const chHeight = charDatas[j].height;
+            if (chWidth !== modelInputWidth || chHeight !== modelInputHeight) {
+                console.log(`Character wrong size in image ${i}`);
+            } else {
+                out += predict(charDatas[j].bitmap, chWidth, chHeight);
+            }
         }
     }
 
@@ -67,7 +77,11 @@ async function main() {
 
         // since '=' are only at the end of the file, they won't be in the training data
         // so I handle them manually
-        out = out.slice(out.indexOf(start), out.indexOf(end)) + end + "==";
+        let startIdx = out.indexOf(start);
+        if (startIdx === -1) startIdx = 0;
+        let endIdx = out.indexOf(end.replaceAll("=", ""));
+        if (endIdx === -1) endIdx = out.length;
+        out = out.slice(startIdx, endIdx) + end;
     }
 
     const outputPath = `./files/${docName}/output`;

@@ -33,9 +33,16 @@ function getPNGImageIPath(docName, idx) {
 async function drawImageI(docName, idx) {
     // 1. Load from local file
     const image = await loadImage(getPNGImageIPath(docName, idx));
-    canvas = createCanvas(image.width, image.height);
+    canvas = createCanvas(image.width*2, image.height*2);
     ctx = canvas.getContext('2d');
-    ctx.drawImage(image, 0, 0);
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+}
+
+function printBitmapAsAscii(chData) {
+    for (let i = 0; i < chData.bitmap.length; i += chData.width) {
+        console.log(chData.bitmap.slice(i, i + chData.width).map(c => c < 230 ? "@" : " ").join(""));
+    }
+    console.log("--------------------");
 }
 
 module.exports = {
@@ -43,5 +50,6 @@ module.exports = {
     getCtx,
     charSet,
     savePath,
-    drawImageI
+    drawImageI,
+    printBitmapAsAscii
 };

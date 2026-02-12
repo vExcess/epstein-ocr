@@ -10,7 +10,7 @@ const tf = require('@tensorflow/tfjs-node');
 const imageProcessor = require("./processImage.js");
 const TRAINING_DATA = require("./training-data.js");
 
-const { charSet, savePath, drawImageI, getCtx, getCanvas } = require("./utils.js");
+const { charSet, savePath, drawImageI, getCtx, getCanvas, printBitmapAsAscii } = require("./utils.js");
 
 async function trainOCR(bitmaps, characters, width, height) {
     // 1. Label Encoding
@@ -19,13 +19,13 @@ async function trainOCR(bitmaps, characters, width, height) {
     // 2. Prepare Tensors
     // We reshape flat arrays into [samples, height, width, channels]
     // '1' at the end represents a single color channel (grayscale)
-    const xs = tf.tensor4d(bitmaps.flat(), [bitmaps.length, height, width, 1]).div(255 >> imageProcessor.rightShift);
+    const xs = tf.tensor4d(bitmaps.flat(), [bitmaps.length, height, width, 1]).div(255 >> imageProcessor.RIGHT_SHIFT);
     const ys = tf.oneHot(tf.tensor1d(labelsAsInts, 'int32'), charSet.length);
 
     // 3. Build the CNN
     let model;
     try {
-        console.log('Loading existing model...');
+        console.log('Loading existing model.');
         model = await tf.loadLayersModel(savePath + "/model.json");
     } catch (err) {
         console.log('No existing model found. Creating new model.');
@@ -38,13 +38,30 @@ async function trainOCR(bitmaps, characters, width, height) {
         */
 
         // First layer: detects basic edges/lines
+        // model.add(tf.layers.conv2d({
+        //     inputShape: [height, width, 1],
+        //     kernelSize: 3,
+        //     filters: 8,
+        //     activation: 'relu',
+        //     padding: 'same'
+        // }));
+
         model.add(tf.layers.conv2d({
             inputShape: [height, width, 1],
             kernelSize: 3,
-            filters: 8,
+            filters: 32, 
             activation: 'relu',
             padding: 'same'
         }));
+        // Add a second Conv layer BEFORE the pooling
+        // This allows the model to "process" the bilinear blur before shrinking it
+        model.add(tf.layers.conv2d({
+            kernelSize: 3,
+            filters: 32,
+            activation: 'relu',
+            padding: 'same'
+        }));
+
         model.add(tf.layers.maxPooling2d({poolSize: 2}));
 
         // Second layer: detects complex shapes
@@ -84,9 +101,8 @@ async function trainOCR(bitmaps, characters, width, height) {
         classWeight[label] = totalSamples / (charSet.length * classCounts[label]);
     });
 
-    console.log('Training...');
     await model.fit(xs, ys, {
-        epochs: 100, // 100 seems optimal
+        epochs: 50,
         batchSize: 16,
         classWeight: classWeight, // This is the magic line
         shuffle: true,
@@ -100,22 +116,52 @@ async function trainOCR(bitmaps, characters, width, height) {
 }
 
 async function main() {
+    let allBitmaps = [];
+    let allExpectedCharacters = [];
+    let chWidths = 0;
+    let chHeights = 0;
+
     for (const docName in TRAINING_DATA) {
-        // load & process training image
-        await drawImageI(docName, 1);
-        const charDatas = imageProcessor.process(getCtx(), getCanvas().width, getCanvas().height);
+        const docTrainingInfo = TRAINING_DATA[docName];
 
-        // train the model
-        const trainingData = TRAINING_DATA[docName]["1"].join("").split("");
-        const bitmaps = charDatas.map(a => a.data).slice(0, trainingData.length);
-        const model = await trainOCR(bitmaps, trainingData, charDatas[0].width, charDatas[0].height);
+        for (let i = 0; i < 10; i++) {
+            const iStr = i.toString();
+            const trainingDataArray = docTrainingInfo[iStr];
+            if (!trainingDataArray) {
+                continue;
+            }
 
-        console.log("Model Trained!");
+            // load & process training image
+            console.log(`Training on ${docName} image ${i}.`);
+            await drawImageI(docName, i);
+            const rows = imageProcessor.process(getCtx(), getCanvas().width, getCanvas().height);
 
-        // --- 5. Save to Disk ---
-        await model.save(savePath);
-        console.log(`Model saved to ${savePath}!`);
+            // train the model
+            const expectedCharacters = trainingDataArray.join("").split("");
+            let skipRows = 0;
+            if (docTrainingInfo.skipRows && docTrainingInfo.skipRows[iStr]) {
+                skipRows = docTrainingInfo.skipRows[iStr];
+            }
+            const charDatas = rows.slice(skipRows).flat();
+            let bitmaps = charDatas.map(c => c.bitmap).slice(0, expectedCharacters.length);
+
+            bitmaps.forEach(b => allBitmaps.push(b));
+            expectedCharacters.forEach(c => allExpectedCharacters.push(c));
+
+            if (chWidths === 0) {
+                chWidths = charDatas[0].width;
+                chHeights = charDatas[0].height;
+            }
+        }
     }
+
+    const model = await trainOCR(allBitmaps, allExpectedCharacters, chWidths, chHeights);
+
+    // --- 5. Save to Disk ---
+    await model.save(savePath);
+    console.log(`Model saved to ${savePath}.`);
+
+    console.log("Training Complete!");
 }
 
 main();
