@@ -3,6 +3,8 @@
 /files/*/*
 !/files/*/output/
 
+temp.txt
+
 package-lock.json
 node_modules
 

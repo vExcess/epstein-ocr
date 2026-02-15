@@ -3,6 +3,8 @@ const util = require('util');
 if (!util.isNullOrUndefined) {
     util.isNullOrUndefined = (obj) => obj === null || obj === undefined;
 }
+// remove deprecation warnings
+process.removeAllListeners('warning');
 
 const fs = require("fs");
 const tf = require('@tensorflow/tfjs-node');
@@ -35,7 +37,7 @@ async function main() {
     const inputShape = model.layers[0].batchInputShape;
     const modelInputWidth = inputShape[2];
     const modelInputHeight = inputShape[1];
-    
+        
     function predict(flatBitmap, width, height) {
         const input = tf.tensor4d(flatBitmap, [1, height, width, 1]).div(255 >> imageProcessor.RIGHT_SHIFT);
         const prediction = model.predict(input);
@@ -46,7 +48,7 @@ async function main() {
         prediction.dispose();
 
         return charSet[index];
-    };
+    }
 
     console.log("OCRing all the files!");
 
@@ -54,20 +56,64 @@ async function main() {
     // skip the first file because it contains non base64 data - handle image 1 manually
     const numImages = fs.readdirSync(`./files/${docName}/png`).length;
     let out = "";
+    let count = 0;
     for (let i = 0; i < numImages; i++) {
         console.log("Processing image " + i + "...");
 
         await drawImageI(docName, i);
         const rows = imageProcessor.process(getCtx(), getCanvas().width, getCanvas().height);
-        const charDatas = rows.flat();
-        for (let j = 0; j < charDatas.length; j++) {
-            const chWidth = charDatas[j].width;
-            const chHeight = charDatas[j].height;
-            if (chWidth !== modelInputWidth || chHeight !== modelInputHeight) {
-                console.log(`Character wrong size in image ${i}`);
-            } else {
-                out += predict(charDatas[j].bitmap, chWidth, chHeight);
+
+        let skipRowFirst = -1;
+        let skipRowLast = -1;
+        for (let j = 0; j < rows.length; j++) {
+            const charDatas = rows[j];
+
+            const validBitmaps = charDatas
+                .filter(c => c.width === modelInputWidth && c.height === modelInputHeight)
+                .map(c => c.bitmap);
+
+            if (validBitmaps.length === 0) {
+                if (skipRowFirst === -1) {
+                    skipRowFirst = j;
+                }
+                skipRowLast = j;
+                continue;
             }
+
+            if (skipRowFirst !== -1) {
+                console.log(`skipping page ${i} rows ${skipRowFirst}-${skipRowLast}`);
+                skipRowFirst = -1;
+            }
+
+            // 3. Stack all bitmaps into one 4D tensor: [batchSize, height, width, 1]
+            const input = tf.tensor4d(
+                validBitmaps.flat(), 
+                [validBitmaps.length, modelInputHeight, modelInputWidth, 1]
+            ).div(255 >> imageProcessor.RIGHT_SHIFT);
+
+            // 4. Predict the entire batch at once
+            const predictions = model.predict(input);
+            const indices = predictions.argMax(1).dataSync();
+            const probabilities = predictions.max(1).dataSync();
+
+            // Convert indices to characters
+            for (let k = 0; k < indices.length; k++) {
+                const guess = charSet[indices[k]];
+                const confidence = probabilities[k];
+                out += guess;
+                count++;
+                if (confidence < 0.75) {
+                    console.log(`${i}-${j}-${k} (${count}) ${guess} ${confidence}%`);
+                }
+            }
+
+            input.dispose();
+            predictions.dispose();
+        }
+
+        if (skipRowFirst !== -1) {
+            console.log(`skipping page ${i} rows ${skipRowFirst}-${skipRowLast}`);
+            skipRowFirst = -1;
         }
     }
 

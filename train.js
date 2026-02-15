@@ -22,11 +22,15 @@ async function trainOCR(bitmaps, characters, width, height) {
     const xs = tf.tensor4d(bitmaps.flat(), [bitmaps.length, height, width, 1]).div(255 >> imageProcessor.RIGHT_SHIFT);
     const ys = tf.oneHot(tf.tensor1d(labelsAsInts, 'int32'), charSet.length);
 
+    // Apply smoothing (e.g., 0.1)
+    // makes model less confident in wrong answers
+    const smoothedYs = ys.mul(1 - 0.1).add(0.1 / charSet.length);
+
     // 3. Build the CNN
     let model;
     try {
-        console.log('Loading existing model.');
         model = await tf.loadLayersModel(savePath + "/model.json");
+        console.log('Loading existing model.');
     } catch (err) {
         console.log('No existing model found. Creating new model.');
         
@@ -101,7 +105,7 @@ async function trainOCR(bitmaps, characters, width, height) {
         classWeight[label] = totalSamples / (charSet.length * classCounts[label]);
     });
 
-    await model.fit(xs, ys, {
+    await model.fit(xs, smoothedYs, {
         epochs: 50,
         batchSize: 16,
         classWeight: classWeight, // This is the magic line
@@ -145,8 +149,25 @@ async function main() {
             const charDatas = rows.slice(skipRows).flat();
             let bitmaps = charDatas.map(c => c.bitmap).slice(0, expectedCharacters.length);
 
-            bitmaps.forEach(b => allBitmaps.push(b));
-            expectedCharacters.forEach(c => allExpectedCharacters.push(c));
+            if (bitmaps.length !== expectedCharacters.length) {
+                console.log("Training data length mismatch", bitmaps.length, expectedCharacters.length);
+            }
+
+            for (let j = 0; j < expectedCharacters.length; j++) {
+                const bitmap = bitmaps[j];
+                const expected = expectedCharacters[j];
+
+                // train more on troublesome characters
+                if ("PH9Y".includes(expected)) {
+                    for (let k = 0; k < 10; k++) {
+                        allBitmaps.push(bitmap);
+                        allExpectedCharacters.push(expected);
+                    }
+                }
+
+                allBitmaps.push(bitmap);
+                allExpectedCharacters.push(expected);
+            }
 
             if (chWidths === 0) {
                 chWidths = charDatas[0].width;
