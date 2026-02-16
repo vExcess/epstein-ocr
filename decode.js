@@ -102,9 +102,9 @@ async function main() {
                 const confidence = probabilities[k];
                 out += guess;
                 count++;
-                if (confidence < 0.75) {
-                    console.log(`${i}-${j}-${k} (${count}) ${guess} ${confidence}%`);
-                }
+                // if (confidence < 0.75) {
+                //     console.log(`${i}-${j}-${k} (${count}) ${guess} ${confidence}%`);
+                // }
             }
 
             input.dispose();

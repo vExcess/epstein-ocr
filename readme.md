@@ -12,7 +12,7 @@ These are the files successfully decoded with my model and their SHA256 hash. It
 | File  | SHA256 Sum |
 | ------------- | ------------- |
 | EFTA00400459  | d0e3d0c8f506e58dc5cecb57b02c3e9cb81d3d0b406c84cbcee410563ce60e66 |
-| EFTA00382108  | Partially decoded - but the PDF is corrupted. Need to do more fine tuning  |
+| EFTA00382108  | c6e2bab74e311b7dcc95401055d6101c186e7d303c23107770bd376a70dff0de |
 
 ## Notes
 This project is partially "vibe coded".

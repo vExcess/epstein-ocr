@@ -61,7 +61,7 @@ async function trainOCR(bitmaps, characters, width, height) {
         // This allows the model to "process" the bilinear blur before shrinking it
         model.add(tf.layers.conv2d({
             kernelSize: 3,
-            filters: 32,
+            filters: 64,
             activation: 'relu',
             padding: 'same'
         }));
@@ -75,11 +75,11 @@ async function trainOCR(bitmaps, characters, width, height) {
             activation: 'relu',
             padding: 'same'
         }));
-        model.add(tf.layers.maxPooling2d({poolSize: 2}));
+        // model.add(tf.layers.maxPooling2d({poolSize: 2}));
 
         // Flatten to transition to classification
         model.add(tf.layers.flatten());
-        model.add(tf.layers.dense({units: 64, activation: 'relu'}));
+        model.add(tf.layers.dense({units: 128, activation: 'relu'}));
         // Add this: It forces the model to generalize
         model.add(tf.layers.dropout({rate: 0.25}));
         model.add(tf.layers.dense({units: charSet.length, activation: 'softmax'}));
@@ -87,7 +87,7 @@ async function trainOCR(bitmaps, characters, width, height) {
 
     // 4. Compile and Train
     model.compile({
-        optimizer: 'adam',
+        optimizer: tf.train.adam(0.0001), // 10x slower for fine-tuning
         loss: 'categoricalCrossentropy',
         metrics: ['accuracy']
     });
@@ -100,14 +100,16 @@ async function trainOCR(bitmaps, characters, width, height) {
 
     const totalSamples = labelsAsInts.length;
     const classWeight = {};
+    const hardCases = "PH9Ygxn0".split("").map(c => c.charCodeAt(0));
     Object.keys(classCounts).forEach(label => {
         // Formula: total / (num_classes * count_for_this_class)
-        classWeight[label] = totalSamples / (charSet.length * classCounts[label]);
+        const times = hardCases.includes(label) ? classCounts[label]+2 : classCounts[label];
+        classWeight[label] = totalSamples / (charSet.length * times);
     });
 
     await model.fit(xs, smoothedYs, {
         epochs: 50,
-        batchSize: 16,
+        batchSize: 32,
         classWeight: classWeight, // This is the magic line
         shuffle: true,
         // callbacks: tf.callbacks.earlyStopping({
@@ -156,14 +158,6 @@ async function main() {
             for (let j = 0; j < expectedCharacters.length; j++) {
                 const bitmap = bitmaps[j];
                 const expected = expectedCharacters[j];
-
-                // train more on troublesome characters
-                if ("PH9Y".includes(expected)) {
-                    for (let k = 0; k < 10; k++) {
-                        allBitmaps.push(bitmap);
-                        allExpectedCharacters.push(expected);
-                    }
-                }
 
                 allBitmaps.push(bitmap);
                 allExpectedCharacters.push(expected);
